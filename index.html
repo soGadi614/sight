@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sight — Sheet Music AI</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --paper: #f7f5f0;
+    --staff: #d4cfc6;
+    --accent: #2a5caa;
+    --accent-light: #e8eef8;
+    --red: #c0392b;
+    --white: #ffffff;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--staff);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .logo {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+  }
+
+  .logo span { font-style: italic; color: var(--accent); }
+  .tagline { font-size: 13px; color: #888; }
+
+  main {
+    flex: 1;
+    padding: 28px 24px;
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--staff);
+    border-radius: var(--radius);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    background: var(--white);
+    margin-bottom: 20px;
+  }
+
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+
+  .upload-zone h2 {
+    font-family: Georgia, serif;
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+
+  .upload-zone p { font-size: 14px; color: #888; }
+
+  .preview-wrap { display: none; margin-bottom: 20px; position: relative; }
+
+  .preview-wrap img {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--staff);
+    display: block;
+  }
+
+  .btn-clear {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.55);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-analyze {
+    width: 100%;
+    padding: 16px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: var(--radius);
+    font-family: Georgia, serif;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .btn-analyze:hover { background: #333; }
+  .btn-analyze:disabled { background: #aaa; cursor: not-allowed; }
+
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .results { display: none; }
+
+  .results-header {
+    font-family: Georgia, serif;
+    font-size: 22px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--staff);
+  }
+
+  .card {
+    background: var(--white);
+    border: 1px solid var(--staff);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .card p { font-size: 15px; line-height: 1.65; color: #333; }
+
+  .step-list { counter-reset: steps; list-style: none; padding: 0; }
+
+  .step-list li {
+    counter-increment: steps;
+    padding: 10px 0 10px 40px;
+    position: relative;
+    border-bottom: 1px solid #f0ede8;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #333;
+  }
+
+  .step-list li:last-child { border-bottom: none; }
+
+  .step-list li::before {
+    content: counter(steps);
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 26px;
+    height: 26px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .error-box {
+    display: none;
+    background: #fdf0ef;
+    border: 1px solid #e8b4b0;
+    border-radius: var(--radius);
+    padding: 16px;
+    color: var(--red);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: #bbb;
+    border-top: 1px solid var(--staff);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Si<span>gh</span>t</div>
+  <div class="tagline">AI sheet music coach</div>
+</header>
+
+<main>
+
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])" />
+    <span class="upload-icon">🎼</span>
+    <h2>Upload a bar of sheet music</h2>
+    <p>Tap to choose a photo or drag one in</p>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <img id="preview" src="" alt="Sheet music preview" />
+    <button class="btn-clear" onclick="clearImage()">✕</button>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <button class="btn-analyze" id="analyzeBtn" onclick="analyze()" disabled>
+    <div class="spinner" id="spinner"></div>
+    <span id="btnText">Analyse this bar</span>
+  </button>
+
+  <div class="results" id="results">
+    <div class="results-header">Here's what's going on</div>
+    <div class="card">
+      <div class="card-label">Note Identification</div>
+      <p id="notesContent">—</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Left Hand</div>
+      <p id="leftContent">—</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Right Hand</div>
+      <p id="rightContent">—</p>
+    </div>
+    <div class="card">
+      <div class="card-label">How to Practice This Bar</div>
+      <ol class="step-list" id="stepsContent"></ol>
+    </div>
+  </div>
+
+</main>
+
+<footer>Sight MVP · Built for intermediate–advanced pianists</footer>
+
+<script>
+  let imageBase64 = null;
+  let imageType = null;
+
+  function handleFile(file) {
+    if (!file) return;
+    imageType = file.type || 'image/jpeg';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      imageBase64 = dataUrl.split(',')[1];
+      document.getElementById('preview').src = dataUrl;
+      document.getElementById('previewWrap').style.display = 'block';
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('analyzeBtn').disabled = false;
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('errorBox').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    imageBase64 = null;
+    imageType = null;
+    document.getElementById('preview').src = '';
+    document.getElementById('previewWrap').style.display = 'none';
+    document.getElementById('uploadZone').style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+  }
+
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#2a5caa'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  async function analyze() {
+    if (!imageBase64) { showError('Please upload an image first.'); return; }
+
+    setLoading(true);
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64, imageType })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Something went wrong');
+      }
+
+      renderResults(data);
+
+    } catch (err) {
+      showError(err.message || 'Something went wrong. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function renderResults(data) {
+    document.getElementById('notesContent').textContent = data.notes || '—';
+    document.getElementById('leftContent').textContent = data.left_hand || '—';
+    document.getElementById('rightContent').textContent = data.right_hand || '—';
+
+    const stepsEl = document.getElementById('stepsContent');
+    stepsEl.innerHTML = '';
+    (data.practice_steps || []).forEach(step => {
+      const li = document.createElement('li');
+      li.textContent = step;
+      stepsEl.appendChild(li);
+    });
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorBox');
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'block';
+  }
+
+  function setLoading(on) {
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btnText').textContent = on ? 'Analysing…' : 'Analyse this bar';
+    document.getElementById('analyzeBtn').disabled = on;
+  }
+</script>
+</body>
+</html>
